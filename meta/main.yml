@@ -1,7 +1,7 @@
 galaxy_info:
   role_name: wireguard_client
   author: Aleksandr Radchenko, mail@kyka.pw
-  description: Simple role for wireguard server auto clients configs and private/public keys generation
+  description: Simple role for wireguard server. Fully automated generation of multiple clients configs with private and public keys.
   company: your company (optional)
   license: GPLv3
   min_ansible_version: 2.0.0
