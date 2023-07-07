@@ -1,0 +1,23 @@
+[Interface]
+Address = {{ wg_server_addr }}
+ListenPort = {{ wg_server_port }}
+PrivateKey = {{ wg_privatekey.stdout}}
+SaveConfig = true
+PreUp = iptables -t nat -A POSTROUTING -j MASQUERADE -o {{ wg_nat_interface }}
+PreDown = iptables -t nat -D POSTROUTING -j MASQUERADE -o {{ wg_nat_interface }}
+
+{% if wg_users is defined %}
+{% for user, value in wg_users.items() %}
+{% if  value.state == 'present' %}
+[Peer]
+# {{ user }}
+{% for line in wg_userkeys.results %}
+{% if line.item.key == user %}
+PublicKey = {{ line.stdout }}
+{% endif %}
+{% endfor %}
+AllowedIPs = {{ value.ip }}
+
+{% endif %}
+{% endfor %}
+{% endif %}

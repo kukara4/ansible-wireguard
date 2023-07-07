@@ -1,0 +1,120 @@
+- name: Enable IPv4 forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: 1
+    sysctl_set: yes
+    state: present
+    reload: yes
+
+- name: Install Wireguard
+  ansible.builtin.apt:
+    name: wireguard
+    update_cache: yes
+
+- name: Create keys directory
+  file:
+    dest: "{{ wg_keys_dir }}"
+    state: directory
+
+- name: Create bin directory
+  file:
+    dest: "{{ wg_bin_dir }}"
+    state: directory
+
+- name: Create client configs directory
+  file:
+    dest: "{{ wg_client_config_dir }}"
+    state: directory
+
+- name: Copy config generator script
+  ansible.builtin.copy:
+    src: files/gen_client_config.sh
+    dest: "{{ wg_bin_dir }}/"
+    owner: root
+    group: root
+    mode: 0777
+    force: true
+
+- name: Create server keys
+  shell: wg genkey | tee {{ wg_keys_dir }}/server-privatekey | wg pubkey | tee {{ wg_keys_dir }}/server-publickey
+  args:
+    creates: "{{ wg_keys_dir }}/server-privatekey"
+
+- name: Register wireguard key
+  shell: cat {{ wg_keys_dir }}/server-privatekey 
+  register: wg_privatekey
+  changed_when: false
+
+- name: Create users pubkeys
+  shell: wg genkey | tee {{ wg_keys_dir }}/{{ item.key }}-privatekey | wg pubkey | tee {{ wg_keys_dir }}/{{ item.key }}-publickey
+  args:
+    creates: "{{ wg_keys_dir }}/{{ item.key }}-privatekey"
+  with_dict: "{{ wg_users }}"
+  when: wg_users is defined and item.value.state == "present"
+
+- name: Register users pubkeys
+  shell: cat {{ wg_keys_dir }}/{{ item.key }}-publickey 
+  register: wg_userkeys
+  changed_when: false
+  with_dict: "{{ wg_users }}"
+  when: wg_users is defined and item.value.state == "present"
+
+- name: Generate wg0.conf
+  template:
+    src: server.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    owner: root
+    group: root
+    mode: 0600
+    force: yes
+  notify: reload_wg
+
+- name: Generate client configs
+  shell: bash {{ wg_bin_dir }}/gen_client_config.sh {{ item.key }} {{ item.value.ip }} {{ ansible_host }} {{ wg_server_port }} {{ item.value.route }} > {{ wg_client_config_dir }}/{{ item.key }}.conf
+  args:
+    creates: "{{ wg_client_config_dir }}/{{ item.key }}.conf"
+  with_dict: "{{ wg_users }}"
+  when: wg_users is defined and item.value.state == "present"
+
+- name: Clear absent public keys
+  ansible.builtin.file:
+    path: "{{ wg_keys_dir }}/{{ item.key }}-publickey"
+    state: absent
+  with_dict: "{{ wg_users }}"
+  when: wg_users is defined and item.value.state == "absent"
+
+- name: Clear absent private keys
+  ansible.builtin.file:
+    path: "{{ wg_keys_dir }}/{{ item.key }}-privatekey"
+    state: absent
+  with_dict: "{{ wg_users }}"
+  when: wg_users is defined and item.value.state == "absent"
+
+- name: Clear absent configs
+  ansible.builtin.file:
+    path: "{{ wg_client_config_dir }}/{{ item.key }}.conf"
+    state: absent
+  with_dict: "{{ wg_users }}"
+  when: wg_users is defined and item.value.state == "absent"
+
+- name: Start and enable wg service
+  ansible.builtin.service:
+    name: wg-quick@wg0.service
+    state: started
+    enabled: yes
+
+- name: Copy clients configs to local storage
+  ansible.builtin.fetch:
+    src: "{{ wg_client_config_dir }}/{{ item.key }}.conf"
+    dest: configs/{{ item.key }}.conf
+    flat: true
+  with_dict: "{{ wg_users }}"
+  when: wg_users is defined and item.value.state == "present"
+
+- name: Clear local configs
+  file: 
+    path: "{{ wg_local_client_config }}/{{ item.key }}.conf"
+    state: absent
+  with_dict: "{{ wg_users }}"
+  when: wg_users is defined and item.value.state == "absent"
+  delegate_to: localhost

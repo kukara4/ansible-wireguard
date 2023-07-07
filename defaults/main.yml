@@ -1,0 +1,19 @@
+wg_keys_dir: /etc/wireguard/keys
+wg_bin_dir: /etc/wireguard/bin
+wg_client_config_dir: /etc/wireguard/configs
+wg_local_client_config: configs
+wg_server_addr: 10.8.0.1/24
+wg_server_port: 51820
+wg_nat_interface: eth0
+
+# wg_users:
+#   client1:
+#     ip: 10.8.0.2/32
+#     route: 0.0.0.0/0
+#     state: present
+#   client2:
+#     ip: 10.8.0.3/32
+#     route: 0.0.0.0/0
+#     state: absent
+
+wg_users: {}

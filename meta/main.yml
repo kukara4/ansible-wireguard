@@ -1,0 +1,17 @@
+galaxy_info:
+  role_name: wireguard_client
+  author: Aleksandr Radchenko, mail@kyka.pw
+  description: Simple role for wireguard server and client config generation
+  company: your company (optional)
+  license: GPLv3
+  min_ansible_version: 2.0.0
+  platforms:
+    - name: Ubuntu
+      versions:
+      - focal
+  galaxy_tags: 
+    - wireguard
+    - wireguard server
+    - wireguard client
+    - vpn
+dependencies: []
